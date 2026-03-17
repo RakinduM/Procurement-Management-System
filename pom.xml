@@ -21,6 +21,7 @@
 		<module>api-gateway</module>
 		<module>common-library</module>
 		<module>user-service</module>
+		<module>supplier-service</module>
 	</modules>
 
 	<properties>
