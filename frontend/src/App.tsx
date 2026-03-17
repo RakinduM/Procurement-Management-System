@@ -4,6 +4,9 @@ import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 
+import UsersPage from './pages/UsersPage';
+import SuppliersPage from './pages/SuppliersPage';
+
 function App() {
   return (
     <BrowserRouter>
@@ -17,8 +20,8 @@ function App() {
             <Route path="/pr" element={<div className="text-xl font-bold">Purchase Requests Coming Soon</div>} />
             <Route path="/po" element={<div className="text-xl font-bold">Purchase Orders Coming Soon</div>} />
             <Route path="/approvals" element={<div className="text-xl font-bold">Approvals Coming Soon</div>} />
-            <Route path="/suppliers" element={<div className="text-xl font-bold">Suppliers Coming Soon</div>} />
-            <Route path="/users" element={<div className="text-xl font-bold">Users Coming Soon</div>} />
+            <Route path="/suppliers" element={<SuppliersPage />} />
+            <Route path="/users" element={<UsersPage />} />
           </Route>
         </Route>
 
