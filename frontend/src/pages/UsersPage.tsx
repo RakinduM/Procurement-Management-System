@@ -49,16 +49,32 @@ export const UsersPage: React.FC = () => {
     active: true
   });
 
-  // Extract unique reference data from existing users for dropdowns
-  const availableRoles = Array.from(new Map(users.filter(u => u.role).map(u => [u.role.id, u.role])).values());
-  const availableBranches = Array.from(new Map(users.filter(u => u.branch).map(u => [u.branch.id, u.branch])).values());
-  const availableDepartments = Array.from(new Map(users.filter(u => u.department).map(u => [u.department.id, u.department])).values());
+  // Reference Data State
+  const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
+  const [availableBranches, setAvailableBranches] = useState<Branch[]>([]);
+  const [availableDepartments, setAvailableDepartments] = useState<Department[]>([]);
 
   const currentUser = useAuthStore((state) => state.user);
 
   useEffect(() => {
     fetchUsers();
+    fetchReferenceData();
   }, []);
+
+  const fetchReferenceData = async () => {
+    try {
+      const [rolesRes, branchesRes, deptsRes] = await Promise.all([
+        api.get('/users/reference/roles'),
+        api.get('/users/reference/branches'),
+        api.get('/users/reference/departments')
+      ]);
+      setAvailableRoles(rolesRes.data.data);
+      setAvailableBranches(branchesRes.data.data);
+      setAvailableDepartments(deptsRes.data.data);
+    } catch (err) {
+      console.error('Failed to fetch reference data', err);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -262,7 +278,7 @@ export const UsersPage: React.FC = () => {
                     <select required value={newUser.roleId} onChange={e => setNewUser({...newUser, roleId: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-colors">
                       <option value="" disabled>Select Role</option>
                       {availableRoles.map(r => (
-                         <option key={r.id} value={r.id}>{r.name}</option>
+                         <option key={r.id} value={r.id}>{r.name || (r as any).roleName}</option>
                       ))}
                     </select>
                   </div>
@@ -271,7 +287,7 @@ export const UsersPage: React.FC = () => {
                     <select required value={newUser.branchId} onChange={e => setNewUser({...newUser, branchId: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-colors">
                       <option value="" disabled>Select Branch</option>
                       {availableBranches.map(b => (
-                         <option key={b.id} value={b.id}>{b.name}</option>
+                         <option key={b.id} value={b.id}>{b.name || (b as any).branchName}</option>
                       ))}
                     </select>
                   </div>
@@ -282,7 +298,7 @@ export const UsersPage: React.FC = () => {
                   <select required value={newUser.departmentId} onChange={e => setNewUser({...newUser, departmentId: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-colors">
                     <option value="" disabled>Select Department</option>
                     {availableDepartments.map(d => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
+                        <option key={d.id} value={d.id}>{d.name || (d as any).departmentName}</option>
                     ))}
                   </select>
                 </div>
