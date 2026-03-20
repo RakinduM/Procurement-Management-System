@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { Search, CheckCircle, XCircle, FileText, ShoppingCart, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/useAuthStore';
+import { canDo } from '../lib/rbac';
 
 interface Approval {
   id: string;
@@ -18,6 +20,14 @@ export const ApprovalsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+
+  // Helper: can the current user approve/reject this entity?
+  const canAction = (entityType: string) => {
+    if (entityType === 'PR') return canDo(user?.role, 'PR_APPROVE');
+    if (entityType === 'PO') return canDo(user?.role, 'PO_APPROVE');
+    return false;
+  };
 
   useEffect(() => {
     fetchApprovals();
@@ -165,21 +175,27 @@ export const ApprovalsPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                        <div className="flex items-center justify-end gap-3">
-                          <button 
-                            disabled={actionLoading === approval.id}
-                            onClick={() => handleAction(approval.id, 'REJECTED')}
-                            className="inline-flex items-center px-3 py-1.5 border border-red-200 text-sm font-medium rounded-lg text-red-700 bg-red-50 hover:bg-red-100 hover:border-red-300 transition-colors disabled:opacity-50"
-                          >
-                            {actionLoading === approval.id ? 'Processing...' : <><XCircle className="h-4 w-4 mr-1.5" /> Reject</>}
-                          </button>
-                          <button 
-                            disabled={actionLoading === approval.id}
-                            onClick={() => handleAction(approval.id, 'APPROVED')}
-                            className="inline-flex items-center px-4 py-1.5 border border-transparent text-sm font-medium rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 transition-all disabled:opacity-50"
-                          >
-                            {actionLoading === approval.id ? 'Processing...' : <><CheckCircle className="h-4 w-4 mr-1.5" /> Approve</>}
-                          </button>
-                       </div>
+                           {canAction(approval.entityType) ? (
+                           <>
+                           <button 
+                             disabled={actionLoading === approval.id}
+                             onClick={(e) => { e.stopPropagation(); handleAction(approval.id, 'REJECTED'); }}
+                             className="inline-flex items-center px-3 py-1.5 border border-red-200 text-sm font-medium rounded-lg text-red-700 bg-red-50 hover:bg-red-100 hover:border-red-300 transition-colors disabled:opacity-50"
+                           >
+                             {actionLoading === approval.id ? 'Processing...' : <><XCircle className="h-4 w-4 mr-1.5" /> Reject</>}
+                           </button>
+                           <button 
+                             disabled={actionLoading === approval.id}
+                             onClick={(e) => { e.stopPropagation(); handleAction(approval.id, 'APPROVED'); }}
+                             className="inline-flex items-center px-4 py-1.5 border border-transparent text-sm font-medium rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-500/20 transition-all disabled:opacity-50"
+                           >
+                             {actionLoading === approval.id ? 'Processing...' : <><CheckCircle className="h-4 w-4 mr-1.5" /> Approve</>}
+                           </button>
+                           </>
+                           ) : (
+                             <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1.5 rounded-lg">View Only</span>
+                           )}
+                        </div>
                     </td>
                   </tr>
                 ))

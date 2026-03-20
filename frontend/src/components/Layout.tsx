@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import {
   LayoutDashboard,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { getNavItems } from '../lib/rbac';
 
 const Layout = () => {
   const { user, logout } = useAuthStore();
@@ -56,14 +57,16 @@ const Layout = () => {
       setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
-  const navItems = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { name: 'Purchase Requests', path: '/pr', icon: FileText },
-    { name: 'Purchase Orders', path: '/po', icon: ShoppingCart },
-    { name: 'Approvals', path: '/approvals', icon: CheckSquare, roles: ['APPROVER', 'ADMIN'] },
-    { name: 'Suppliers', path: '/suppliers', icon: Truck },
-    { name: 'Users', path: '/users', icon: Users, roles: ['ADMIN'] },
-  ];
+  const iconMap: Record<string, React.FC<any>> = {
+    '/': LayoutDashboard,
+    '/pr': FileText,
+    '/po': ShoppingCart,
+    '/approvals': CheckSquare,
+    '/suppliers': Truck,
+    '/users': Users,
+  };
+
+  const navItems = getNavItems(user?.role);
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
@@ -77,12 +80,12 @@ const Layout = () => {
         <div className="flex-1 overflow-y-auto py-4">
           <nav className="px-3 space-y-1">
             {navItems.map((item) => {
-              if (item.roles && !item.roles.includes(user?.role || '')) return null;
-
+              const Icon = iconMap[item.path] || LayoutDashboard;
               return (
                 <NavLink
                   key={item.name}
                   to={item.path}
+                  end={item.path === '/'}
                   className={({ isActive }) =>
                     `group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
                       isActive
@@ -92,15 +95,15 @@ const Layout = () => {
                   }
                 >
                   {({ isActive }) => (
-                     <>
-                        <item.icon
+                    <>
+                      <Icon
                         className={`mr-3 flex-shrink-0 h-5 w-5 transition-colors ${
                           isActive ? 'text-primary-500' : 'text-slate-500 group-hover:text-slate-300'
                         }`}
                         aria-hidden="true"
-                        />
-                        {item.name}
-                     </>
+                      />
+                      {item.name}
+                    </>
                   )}
                 </NavLink>
               );

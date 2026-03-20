@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/useAuthStore';
 import { ArrowLeft, ShoppingCart, FileText, DollarSign, Package, Building, AlertTriangle, Edit2, Save, X, Plus, Trash2 } from 'lucide-react';
+import { canDo } from '../lib/rbac';
 
 interface POLine { lineNo: number; item: string; description: string; quantity: number; unitPrice: number; lineAmount: number; }
 interface PurchaseOrder { poNumber: string; prId: string; supplierId: string; branchId: string; description: string; status: string; currency: string; totalAmount: number; orderDate: string; rejectReason: string; createdBy: string; poLines: POLine[]; }
@@ -21,6 +23,7 @@ const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) =>
 export const PODetailPage: React.FC = () => {
   const { id } = useParams<{id:string}>();
   const navigate = useNavigate();
+  const authUser = useAuthStore((s) => s.user);
   const [po, setPo] = useState<PurchaseOrder|null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -68,7 +71,7 @@ export const PODetailPage: React.FC = () => {
   const calcTotal=(lines:POLine[])=>lines.reduce((s,l)=>s+(l.lineAmount||l.quantity*l.unitPrice),0);
   const fmt=(n:number,cur='LKR')=>`${cur} ${n.toLocaleString('en-US',{minimumFractionDigits:2})}`;
   const fmtDate=(d:string)=>d?new Date(d).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}):'—';
-  const canEdit=po&&po.status==='PENDING_APPROVAL';
+  const canEdit = po && po.status === 'PENDING_APPROVAL' && canDo(authUser?.role, 'PO_EDIT');
 
   if(loading) return <div className="flex items-center justify-center min-h-64"><div className="animate-spin rounded-full h-10 w-10 border-4 border-slate-200 border-t-emerald-600"></div></div>;
   if(!po) return <div className="bg-white rounded-2xl p-12 text-center border border-slate-100"><AlertTriangle className="mx-auto h-10 w-10 text-amber-400 mb-3"/><p className="text-slate-600 font-medium">{error||'PO not found.'}</p><button onClick={()=>navigate('/po')} className="mt-4 text-sm text-emerald-600 hover:underline">← Back to list</button></div>;

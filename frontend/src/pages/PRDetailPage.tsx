@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/useAuthStore';
 import { ArrowLeft, Edit2, Save, X, FileText, Zap, Calendar, User, Building, Briefcase, Package, DollarSign, AlertTriangle } from 'lucide-react';
 import { Plus, Trash2 } from 'lucide-react';
+import { canDo } from '../lib/rbac';
 
 interface PRLine {
   lineNo: number;
@@ -74,6 +76,7 @@ const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) =>
 export const PRDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const authUser = useAuthStore((s) => s.user);
 
   const [pr, setPr] = useState<PurchaseRequest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -159,7 +162,7 @@ export const PRDetailPage: React.FC = () => {
   const fmt = (n: number, cur = 'LKR') => `${cur} ${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
   const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '—';
 
-  const canEdit = pr && EDITABLE_STATUSES.includes(pr.status);
+  const canEdit = pr && EDITABLE_STATUSES.includes(pr.status) && canDo(authUser?.role, 'PR_EDIT');
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-64">

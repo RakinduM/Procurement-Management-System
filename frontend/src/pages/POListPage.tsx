@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 import { Plus, Search, Eye, ShoppingCart, AlertCircle, Calendar, Truck } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNavigate } from 'react-router-dom';
+import { canDo } from '../lib/rbac';
 
 interface POLine {
   lineNo: number;
@@ -81,7 +82,7 @@ export const POListPage: React.FC = () => {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Purchase Orders</h1>
           <p className="text-sm text-slate-500 mt-1">Manage vendor orders generated from approved purchase requests.</p>
         </div>
-        {(user?.role === 'REQUESTER' || user?.role === 'ADMIN') && (
+        {canDo(user?.role, 'PO_CREATE') && (
           <button
             className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none transition-all hover:shadow-md hover:-translate-y-0.5"
             onClick={() => navigate('/po/new')}

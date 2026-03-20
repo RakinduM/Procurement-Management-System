@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthGuard } from './components/AuthGuard';
+import { RoleGuard, UnauthorizedPage } from './components/RoleGuard';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
@@ -20,29 +21,51 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        
-        {/* Protected Routes inside Layout */}
+
+        {/* Protected Routes — must be authenticated */}
         <Route element={<AuthGuard />}>
           <Route element={<Layout />}>
+
+            {/* Dashboard — accessible to all authenticated users */}
             <Route path="/" element={<Dashboard />} />
 
-            {/* Purchase Requests */}
-            <Route path="/pr" element={<PRListPage />} />
-            <Route path="/pr/new" element={<PRCreatePage />} />
-            <Route path="/pr/:id" element={<PRDetailPage />} />
+            {/* Unauthorized page */}
+            <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-            {/* Purchase Orders */}
-            <Route path="/po" element={<POListPage />} />
-            <Route path="/po/new" element={<POCreatePage />} />
-            <Route path="/po/:id" element={<PODetailPage />} />
+            {/* ── Purchase Requests ── */}
+            <Route element={<RoleGuard path="/pr" />}>
+              <Route path="/pr" element={<PRListPage />} />
+              <Route path="/pr/:id" element={<PRDetailPage />} />
+            </Route>
+            <Route element={<RoleGuard path="/pr/new" />}>
+              <Route path="/pr/new" element={<PRCreatePage />} />
+            </Route>
 
-            {/* Approvals */}
-            <Route path="/approvals" element={<ApprovalsPage />} />
-            <Route path="/approvals/:id" element={<ApprovalDetailPage />} />
+            {/* ── Purchase Orders ── */}
+            <Route element={<RoleGuard path="/po" />}>
+              <Route path="/po" element={<POListPage />} />
+              <Route path="/po/:id" element={<PODetailPage />} />
+            </Route>
+            <Route element={<RoleGuard path="/po/new" />}>
+              <Route path="/po/new" element={<POCreatePage />} />
+            </Route>
 
-            {/* Admin */}
-            <Route path="/suppliers" element={<SuppliersPage />} />
-            <Route path="/users" element={<UsersPage />} />
+            {/* ── Approvals ── */}
+            <Route element={<RoleGuard path="/approvals" />}>
+              <Route path="/approvals" element={<ApprovalsPage />} />
+              <Route path="/approvals/:id" element={<ApprovalDetailPage />} />
+            </Route>
+
+            {/* ── Suppliers ── */}
+            <Route element={<RoleGuard path="/suppliers" />}>
+              <Route path="/suppliers" element={<SuppliersPage />} />
+            </Route>
+
+            {/* ── User Management ── */}
+            <Route element={<RoleGuard path="/users" />}>
+              <Route path="/users" element={<UsersPage />} />
+            </Route>
+
           </Route>
         </Route>
 
