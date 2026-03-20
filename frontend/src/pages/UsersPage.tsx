@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { UserPlus, Search, Edit2, Trash2, Mail, Shield, Building2, X, Save } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
+import { canDo } from '../lib/rbac';
 
 interface Branch {
   id: string;
@@ -115,13 +116,15 @@ export const UsersPage: React.FC = () => {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">User Management</h1>
           <p className="text-sm text-slate-500 mt-1">Manage system access, roles, and organizational assignments.</p>
         </div>
-        <button 
-          onClick={() => setIsAddModalOpen(true)}
-          className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none transition-all hover:shadow-md hover:-translate-y-0.5"
-        >
-          <UserPlus className="h-4 w-4 mr-2" />
-          Add User
-        </button>
+        {canDo(currentUser?.role, 'USER_MANAGE') && (
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none transition-all hover:shadow-md hover:-translate-y-0.5"
+          >
+            <UserPlus className="h-4 w-4 mr-2" />
+            Add User
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -195,10 +198,21 @@ export const UsersPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center text-sm text-slate-700 font-medium">
-                        <Shield className="h-4 w-4 mr-1.5 text-slate-400" />
-                        {availableRoles.find(r => r.id === user.roleId)?.roleName || 'N/A'}
-                      </div>
+                      {(() => {
+                        const roleName = availableRoles.find(r => r.id === user.roleId)?.roleName || 'N/A';
+                        const roleColors: Record<string, string> = {
+                          ADMIN: 'bg-purple-100 text-purple-800 border-purple-200',
+                          PR_REQUESTOR: 'bg-blue-100 text-blue-800 border-blue-200',
+                          PR_APPROVER: 'bg-sky-100 text-sky-800 border-sky-200',
+                          PO_REQUESTOR: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                          PO_APPROVER: 'bg-teal-100 text-teal-800 border-teal-200',
+                        };
+                        return (
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${roleColors[roleName] || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+                            <Shield className="h-3 w-3 mr-1" />{roleName}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col">
@@ -215,16 +229,24 @@ export const UsersPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end gap-2">
-                        <button className="text-primary-600 hover:text-primary-900 p-1.5 hover:bg-primary-50 rounded-lg transition-colors">
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        {currentUser?.username !== user.username && (
-                          <button className="text-red-600 hover:text-red-900 p-1.5 hover:bg-red-50 rounded-lg transition-colors">
-                            <Trash2 className="h-4 w-4" />
+                      {canDo(currentUser?.role, 'USER_MANAGE') && (
+                        <div className="flex justify-end gap-2">
+                          <button
+                            title="Edit User"
+                            className="text-primary-600 hover:text-primary-900 p-1.5 hover:bg-primary-50 rounded-lg transition-colors border border-transparent hover:border-primary-100"
+                          >
+                            <Edit2 className="h-4 w-4" />
                           </button>
-                        )}
-                      </div>
+                          {currentUser?.username !== user.username && (
+                            <button
+                              title="Deactivate / Remove User"
+                              className="text-red-600 hover:text-red-900 p-1.5 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -278,7 +300,7 @@ export const UsersPage: React.FC = () => {
                     <select required value={newUser.roleId} onChange={e => setNewUser({...newUser, roleId: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-colors">
                       <option value="" disabled>Select Role</option>
                       {availableRoles.map(r => (
-                         <option key={r.id} value={r.id}>{r.roleName || (r as any).roleName}</option>
+                         <option key={r.id} value={r.id}>{r.roleName}</option>
                       ))}
                     </select>
                   </div>
@@ -287,7 +309,7 @@ export const UsersPage: React.FC = () => {
                     <select required value={newUser.branchId} onChange={e => setNewUser({...newUser, branchId: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-colors">
                       <option value="" disabled>Select Branch</option>
                       {availableBranches.map(b => (
-                         <option key={b.id} value={b.id}>{b.branchName || (b as any).branchName}</option>
+                         <option key={b.id} value={b.id}>{b.branchName}</option>
                       ))}
                     </select>
                   </div>
@@ -298,7 +320,7 @@ export const UsersPage: React.FC = () => {
                   <select required value={newUser.departmentId} onChange={e => setNewUser({...newUser, departmentId: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-colors">
                     <option value="" disabled>Select Department</option>
                     {availableDepartments.map(d => (
-                        <option key={d.id} value={d.id}>{d.departmentName || (d as any).departmentName}</option>
+                        <option key={d.id} value={d.id}>{d.departmentName}</option>
                     ))}
                   </select>
                 </div>
