@@ -2,6 +2,7 @@ package com.procurement.approvalservice.service;
 
 import com.procurement.approvalservice.client.POServiceClient;
 import com.procurement.approvalservice.client.PRServiceClient;
+import com.procurement.approvalservice.client.UserServiceClient;
 import com.procurement.approvalservice.model.Approval;
 import com.procurement.approvalservice.repository.ApprovalRepository;
 import com.procurement.common.exception.BusinessRuleException;
@@ -21,6 +22,7 @@ public class ApprovalService {
     private final ApprovalRepository approvalRepository;
     private final PRServiceClient prClient;
     private final POServiceClient poClient;
+    private final UserServiceClient userClient;
     private final SimpMessagingTemplate messagingTemplate;
 
     public Approval createApprovalRequest(String entityType, String entityId, String requestedBy) {
@@ -50,6 +52,13 @@ public class ApprovalService {
 
         if (!approval.getStatus().equals("PENDING")) {
             throw new BusinessRuleException("Approval request is already " + approval.getStatus());
+        }
+
+        // Validate approver exists in User Service (Inter-service call)
+        try {
+            userClient.getUserById(approverId, token);
+        } catch (Exception e) {
+            throw new BusinessRuleException("Approver user not found in the system: " + approverId);
         }
 
         // Validate Role — accept specific approver roles or ADMIN

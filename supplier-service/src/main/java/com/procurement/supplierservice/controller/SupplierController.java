@@ -17,8 +17,16 @@ public class SupplierController {
     private final SupplierService supplierService;
 
     @PostMapping
-    public ResponseEntity<CommonResponse<Supplier>> createSupplier(@RequestBody Supplier supplier) {
-        Supplier createdSupplier = supplierService.createSupplier(supplier);
+    public ResponseEntity<CommonResponse<Supplier>> createSupplier(
+            @RequestBody Supplier supplier,
+            @RequestHeader(value = "Authorization", required = false) String token,
+            @RequestHeader(value = "X-User-Id", required = false) String createdBy) {
+
+        // Fall back to a system identifier if header not present
+        String creator = (createdBy != null) ? createdBy : "system";
+        String authToken = (token != null) ? token : "";
+
+        Supplier createdSupplier = supplierService.createSupplier(supplier, creator, authToken);
         return ResponseEntity.ok(CommonResponse.success(createdSupplier, "Supplier created successfully"));
     }
 
