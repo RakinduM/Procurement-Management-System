@@ -52,8 +52,8 @@ public class ApprovalService {
             throw new BusinessRuleException("Approval request is already " + approval.getStatus());
         }
 
-        // Validate Role (simulated, token validation handles this at API layer if strictly enforced. We just double check).
-        if (!approverRole.equals("APPROVER") && !approverRole.equals("ADMIN")) {
+        // Validate Role — accept specific approver roles or ADMIN
+        if (!approverRole.equals("PR_APPROVER") && !approverRole.equals("PO_APPROVER") && !approverRole.equals("ADMIN")) {
             throw new BusinessRuleException("You do not have permission to approve/reject requests.");
         }
 
