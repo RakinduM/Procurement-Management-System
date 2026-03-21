@@ -116,6 +116,21 @@ public class PurchaseOrderService {
             existing.setPoLines(update.getPoLines());
             existing.setTotalAmount(total);
         }
-        return poRepository.save(existing);
+        PurchaseOrder saved = poRepository.save(existing);
+
+        // Re-trigger the approval workflow so approvers see the updated PO content
+        try {
+            ApprovalRequestDTO dto = new ApprovalRequestDTO();
+            dto.setEntityType("PO");
+            dto.setEntityId(saved.getPoNumber());
+            dto.setRequestedBy(saved.getCreatedBy());
+            approvalClient.reRequestApproval(dto, "Bearer internal");
+        } catch (Exception e) {
+            // Non-fatal: log but don't fail the save operation
+            System.err.println("[PurchaseOrderService] Failed to re-request approval for " + poNumber + ": " + e.getMessage());
+        }
+
+        return saved;
     }
 }
+

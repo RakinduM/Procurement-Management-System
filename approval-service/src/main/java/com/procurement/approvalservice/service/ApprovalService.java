@@ -94,4 +94,35 @@ public class ApprovalService {
 
         return savedApproval;
     }
+
+    /**
+     * Called when a PR or PO is edited after submission.
+     * Finds the most recent approval for the entity and resets it to PENDING,
+     * or creates a new one if none exists. Notifies approvers via WebSocket.
+     */
+    @Transactional
+    public Approval reRequestApproval(String entityType, String entityId, String requestedBy) {
+        // Find existing approval(s) for this entity
+        List<Approval> existing = approvalRepository.findByEntityTypeAndEntityId(entityType, entityId);
+
+        if (!existing.isEmpty()) {
+            // Reset the most recent one back to PENDING
+            Approval latestApproval = existing.stream()
+                    .max(java.util.Comparator.comparing(Approval::getCreatedAt))
+                    .get();
+            latestApproval.setStatus("PENDING");
+            latestApproval.setApprovedBy(null);
+            latestApproval.setRejectReason(null);
+            latestApproval.setActionedAt(null);
+            latestApproval.setCreatedAt(new Date()); // Refresh timestamp
+            latestApproval.setRequestedBy(requestedBy);
+            Approval saved = approvalRepository.save(latestApproval);
+            messagingTemplate.convertAndSend("/topic/approvals",
+                    "Approval Re-Requested for " + entityType + " " + entityId + " (content updated)");
+            return saved;
+        } else {
+            // No prior approval — create a fresh one
+            return createApprovalRequest(entityType, entityId, requestedBy);
+        }
+    }
 }

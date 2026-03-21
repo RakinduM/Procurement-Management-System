@@ -96,6 +96,21 @@ public class PurchaseRequestService {
             }
             existing.setPrLines(update.getPrLines());
         }
-        return prRepository.save(existing);
+        PurchaseRequest saved = prRepository.save(existing);
+
+        // Re-trigger the approval workflow so approvers see the updated content
+        try {
+            ApprovalRequestDTO dto = new ApprovalRequestDTO();
+            dto.setEntityType("PR");
+            dto.setEntityId(saved.getPrNumber());
+            dto.setRequestedBy(saved.getRequestorId());
+            approvalClient.reRequestApproval(dto, "Bearer internal");
+        } catch (Exception e) {
+            // Non-fatal: log but don't fail the save operation
+            System.err.println("[PurchaseRequestService] Failed to re-request approval for " + prNumber + ": " + e.getMessage());
+        }
+
+        return saved;
     }
 }
+

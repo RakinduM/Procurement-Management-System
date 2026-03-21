@@ -38,6 +38,17 @@ public class ApprovalController {
         return ResponseEntity.ok(CommonResponse.success(approvals, "Pending approvals fetched successfully."));
     }
 
+    // Called by PR/PO Services when a document is edited — re-triggers the approval workflow
+    @PostMapping("/re-request")
+    public ResponseEntity<CommonResponse<Approval>> reRequestApproval(@RequestBody ApprovalRequestDTO request) {
+        Approval approval = approvalService.reRequestApproval(
+                request.getEntityType(),
+                request.getEntityId(),
+                request.getRequestedBy()
+        );
+        return ResponseEntity.ok(CommonResponse.success(approval, "Approval re-requested successfully."));
+    }
+
     // Called by Approvers on the Frontend
     @PostMapping("/{id}/action")
     public ResponseEntity<CommonResponse<Approval>> actionApproval(

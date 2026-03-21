@@ -86,6 +86,7 @@ export const PRDetailPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [confirmSave, setConfirmSave] = useState(false);
+  const [requestorName, setRequestorName] = useState<string>('');
 
   // Edit state (clone of PR for editing)
   const [editData, setEditData] = useState<Partial<PurchaseRequest>>({});
@@ -118,6 +119,17 @@ export const PRDetailPage: React.FC = () => {
         currency: data.currency,
       });
       setEditLines((data.prLines || []).map(l => ({ ...l })));
+
+      // Resolve requestorId to username (non-blocking)
+      if (data.requestorId) {
+        try {
+          const userRes = await api.get(`/users/${data.requestorId}`);
+          const u = userRes.data.data;
+          setRequestorName(u?.username || data.requestorId);
+        } catch {
+          setRequestorName(data.requestorId); // fallback to raw ID
+        }
+      }
     } catch {
       setError('Failed to load Purchase Request.');
     } finally {
@@ -259,7 +271,7 @@ export const PRDetailPage: React.FC = () => {
             <InfoRow label="Description" value={pr.description} />
             <InfoRow label="Priority" value={pr.priority ? <PriorityBadge priority={pr.priority} /> : '—'} />
             <InfoRow label="Need By Date" value={<span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5 text-slate-400" />{fmtDate(pr.needByDate)}</span>} />
-            <InfoRow label="Requestor" value={<span className="flex items-center gap-1"><User className="h-3.5 w-3.5 text-slate-400" />{pr.requestorId}</span>} />
+            <InfoRow label="Requestor" value={<span className="flex items-center gap-1"><User className="h-3.5 w-3.5 text-slate-400" />{requestorName || pr.requestorId}</span>} />
             <InfoRow label="Branch" value={<span className="flex items-center gap-1"><Building className="h-3.5 w-3.5 text-slate-400" />{resolveName(branches as any, pr.branchId, 'branchName')}</span>} />
             <InfoRow label="Department" value={<span className="flex items-center gap-1"><Briefcase className="h-3.5 w-3.5 text-slate-400" />{resolveName(departments as any, pr.departmentId, 'departmentName')}</span>} />
             <InfoRow label="Supplier" value={<span className="flex items-center gap-1"><Package className="h-3.5 w-3.5 text-slate-400" />{pr.supplierId ? resolveName(suppliers as any, pr.supplierId, 'supplierName') : '—'}</span>} />

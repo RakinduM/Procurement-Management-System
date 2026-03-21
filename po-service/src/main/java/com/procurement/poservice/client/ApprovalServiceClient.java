@@ -10,6 +10,11 @@ import org.springframework.web.bind.annotation.RequestHeader;
 public interface ApprovalServiceClient {
 
     @PostMapping("/api/v1/approvals")
-    CommonResponse<Object> requestApproval(@RequestBody ApprovalRequestDTO requestDTO, 
+    CommonResponse<Object> requestApproval(@RequestBody ApprovalRequestDTO requestDTO,
                                            @RequestHeader("Authorization") String token);
+
+    @PostMapping("/api/v1/approvals/re-request")
+    CommonResponse<Object> reRequestApproval(@RequestBody ApprovalRequestDTO requestDTO,
+                                             @RequestHeader("Authorization") String token);
 }
+
