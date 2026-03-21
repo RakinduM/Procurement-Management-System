@@ -97,4 +97,25 @@ public class PurchaseOrderService {
         }
         return poRepository.save(po);
     }
+
+    @Transactional
+    public PurchaseOrder updatePurchaseOrder(String poNumber, PurchaseOrder update) {
+        PurchaseOrder existing = getPurchaseOrderById(poNumber);
+        if (!"PENDING_APPROVAL".equals(existing.getStatus())) {
+            throw new BusinessRuleException("Only Purchase Orders in PENDING_APPROVAL status can be edited.");
+        }
+        existing.setDescription(update.getDescription());
+        existing.setSupplierId(update.getSupplierId());
+        existing.setCurrency(update.getCurrency());
+        if (update.getPoLines() != null) {
+            BigDecimal total = BigDecimal.ZERO;
+            for (var line : update.getPoLines()) {
+                line.setLineAmount(line.getQuantity().multiply(line.getUnitPrice()));
+                total = total.add(line.getLineAmount());
+            }
+            existing.setPoLines(update.getPoLines());
+            existing.setTotalAmount(total);
+        }
+        return poRepository.save(existing);
+    }
 }

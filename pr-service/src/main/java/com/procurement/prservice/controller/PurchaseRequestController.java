@@ -51,4 +51,13 @@ public class PurchaseRequestController {
         PurchaseRequest updatedPr = prService.updateStatus(prNumber, status, rejectReason);
         return ResponseEntity.ok(CommonResponse.success(updatedPr, "Purchase Request status updated successfully."));
     }
+
+    // Endpoint called by Frontend to update PR details (only while PENDING_APPROVAL)
+    @PutMapping("/{prNumber}")
+    public ResponseEntity<CommonResponse<PurchaseRequest>> updatePurchaseRequest(
+            @PathVariable String prNumber,
+            @RequestBody PurchaseRequest pr) {
+        PurchaseRequest updated = prService.updatePurchaseRequest(prNumber, pr);
+        return ResponseEntity.ok(CommonResponse.success(updated, "Purchase Request updated successfully."));
+    }
 }

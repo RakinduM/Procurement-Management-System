@@ -51,4 +51,13 @@ public class PurchaseOrderController {
         PurchaseOrder updatedPo = poService.updateStatus(poNumber, status, rejectReason);
         return ResponseEntity.ok(CommonResponse.success(updatedPo, "Purchase Order status updated successfully."));
     }
+
+    // Endpoint called by Frontend to update PO details (only while PENDING_APPROVAL)
+    @PutMapping("/{poNumber}")
+    public ResponseEntity<CommonResponse<PurchaseOrder>> updatePurchaseOrder(
+            @PathVariable String poNumber,
+            @RequestBody PurchaseOrder po) {
+        PurchaseOrder updated = poService.updatePurchaseOrder(poNumber, po);
+        return ResponseEntity.ok(CommonResponse.success(updated, "Purchase Order updated successfully."));
+    }
 }

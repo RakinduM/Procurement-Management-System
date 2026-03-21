@@ -35,7 +35,9 @@ interface PurchaseRequest {
   prLines: PRLine[];
 }
 
-interface Supplier { id: string; supplierName: string; isActive?: boolean; active?: boolean; }
+interface Supplier { id: string; supplierName: string; active: boolean; }
+interface Branch { id: string; branchName: string; }
+interface Department { id: string; departmentName: string; }
 
 const EDITABLE_STATUSES = ['PENDING_APPROVAL'];
 
@@ -89,8 +91,14 @@ export const PRDetailPage: React.FC = () => {
   const [editData, setEditData] = useState<Partial<PurchaseRequest>>({});
   const [editLines, setEditLines] = useState<PRLine[]>([]);
 
-  // Reference data for dropdowns
+  // Reference data for dropdowns and ID resolution
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+
+  // Helper: resolve ID → name from reference data
+  const resolveName = (list: { id: string; [k: string]: string }[], id: string, key: string) =>
+    list.find(i => i.id === id)?.[key] || id || '—';
 
   useEffect(() => {
     fetchPR();
@@ -119,10 +127,14 @@ export const PRDetailPage: React.FC = () => {
 
   const fetchRefData = async () => {
     try {
-      const [supRes] = await Promise.all([
+      const [supRes, branchRes, deptRes] = await Promise.all([
         api.get('/suppliers'),
+        api.get('/users/reference/branches'),
+        api.get('/users/reference/departments'),
       ]);
-      setSuppliers((supRes.data.data || []).filter((s: Supplier) => s.isActive || s.active));
+      setSuppliers((supRes.data.data || []).filter((s: Supplier) => s.active));
+      setBranches(branchRes.data.data || []);
+      setDepartments(deptRes.data.data || []);
     } catch { /* non-critical */ }
   };
 
@@ -248,9 +260,9 @@ export const PRDetailPage: React.FC = () => {
             <InfoRow label="Priority" value={pr.priority ? <PriorityBadge priority={pr.priority} /> : '—'} />
             <InfoRow label="Need By Date" value={<span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5 text-slate-400" />{fmtDate(pr.needByDate)}</span>} />
             <InfoRow label="Requestor" value={<span className="flex items-center gap-1"><User className="h-3.5 w-3.5 text-slate-400" />{pr.requestorId}</span>} />
-            <InfoRow label="Branch" value={<span className="flex items-center gap-1"><Building className="h-3.5 w-3.5 text-slate-400" />{pr.branchId}</span>} />
-            <InfoRow label="Department" value={<span className="flex items-center gap-1"><Briefcase className="h-3.5 w-3.5 text-slate-400" />{pr.departmentId}</span>} />
-            <InfoRow label="Supplier" value={<span className="flex items-center gap-1"><Package className="h-3.5 w-3.5 text-slate-400" />{pr.supplierId || '—'}</span>} />
+            <InfoRow label="Branch" value={<span className="flex items-center gap-1"><Building className="h-3.5 w-3.5 text-slate-400" />{resolveName(branches as any, pr.branchId, 'branchName')}</span>} />
+            <InfoRow label="Department" value={<span className="flex items-center gap-1"><Briefcase className="h-3.5 w-3.5 text-slate-400" />{resolveName(departments as any, pr.departmentId, 'departmentName')}</span>} />
+            <InfoRow label="Supplier" value={<span className="flex items-center gap-1"><Package className="h-3.5 w-3.5 text-slate-400" />{pr.supplierId ? resolveName(suppliers as any, pr.supplierId, 'supplierName') : '—'}</span>} />
             <InfoRow label="Currency" value={<span className="flex items-center gap-1"><DollarSign className="h-3.5 w-3.5 text-slate-400" />{pr.currency}</span>} />
           </div>
         ) : (

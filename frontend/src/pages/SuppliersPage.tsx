@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { Plus, Search, Edit2, MapPin, Phone, Building, X, Save, Mail } from 'lucide-react';
+import { useAuthStore } from '../store/useAuthStore';
+import { canDo } from '../lib/rbac';
 
 interface Supplier {
   id: string;
@@ -9,7 +11,7 @@ interface Supplier {
   phone: string;
   email: string;
   currency: string;
-  active: boolean;
+  active: boolean; // Java boolean isActive serializes as 'active' via Lombok
   createdAt: string;
 }
 
@@ -17,6 +19,7 @@ export const SuppliersPage: React.FC = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const currentUser = useAuthStore((state) => state.user);
   
   // Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -94,13 +97,15 @@ export const SuppliersPage: React.FC = () => {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Supplier Directory</h1>
           <p className="text-sm text-slate-500 mt-1">Manage vendor relationships, contacts, and approval statuses.</p>
         </div>
-        <button 
-          onClick={() => setIsAddModalOpen(true)}
-          className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none transition-all hover:shadow-md hover:-translate-y-0.5"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Onboard Supplier
-        </button>
+        {canDo(currentUser?.role, 'SUPPLIER_CREATE') && (
+          <button 
+            onClick={() => setIsAddModalOpen(true)}
+            className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none transition-all hover:shadow-md hover:-translate-y-0.5"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Onboard Supplier
+          </button>
+        )}
       </div>
 
       {/* SEARCH */}

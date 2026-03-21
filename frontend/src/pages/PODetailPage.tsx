@@ -7,7 +7,8 @@ import { canDo } from '../lib/rbac';
 
 interface POLine { lineNo: number; item: string; description: string; quantity: number; unitPrice: number; lineAmount: number; }
 interface PurchaseOrder { poNumber: string; prId: string; supplierId: string; branchId: string; description: string; status: string; currency: string; totalAmount: number; orderDate: string; rejectReason: string; createdBy: string; poLines: POLine[]; }
-interface Supplier { id: string; supplierName: string; isActive?: boolean; active?: boolean; }
+interface Supplier { id: string; supplierName: string; active: boolean; }
+interface Branch { id: string; branchName: string; }
 
 function StatusBadge({ status }: { status: string }) {
   const m: Record<string,string> = { APPROVED:'bg-emerald-100 text-emerald-800 border-emerald-200', PENDING_APPROVAL:'bg-amber-100 text-amber-800 border-amber-200', REJECTED:'bg-red-100 text-red-800 border-red-200', DELIVERED:'bg-blue-100 text-blue-800 border-blue-200' };
@@ -33,6 +34,11 @@ export const PODetailPage: React.FC = () => {
   const [editData, setEditData] = useState<Partial<PurchaseOrder>>({});
   const [editLines, setEditLines] = useState<POLine[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+
+  // Helper: resolve ID → name
+  const resolveName = (list: {id: string; [k: string]: string}[], id: string, key: string) =>
+    list.find(i => i.id === id)?.[key] || id || '—';
 
   useEffect(() => { fetchPO(); fetchSuppliers(); }, [id]);
 
@@ -47,7 +53,14 @@ export const PODetailPage: React.FC = () => {
   };
 
   const fetchSuppliers = async () => {
-    try { const r = await api.get('/suppliers'); setSuppliers((r.data.data||[]).filter((s:Supplier)=>s.isActive||s.active)); } catch{}
+    try {
+      const [r, br] = await Promise.all([
+        api.get('/suppliers'),
+        api.get('/users/reference/branches'),
+      ]);
+      setSuppliers((r.data.data||[]).filter((s:Supplier)=>s.active));
+      setBranches(br.data.data || []);
+    } catch {}
   };
 
   const changeL = (idx:number, f:keyof POLine, v:any) => {
@@ -103,8 +116,8 @@ export const PODetailPage: React.FC = () => {
           <div className="divide-y divide-slate-50">
             <InfoRow label="PO Number" value={po.poNumber}/>
             <InfoRow label="PR Reference" value={<button onClick={()=>navigate(`/pr/${po.prId}`)} className="text-primary-600 hover:underline flex items-center gap-1"><FileText className="h-3.5 w-3.5"/>{po.prId}</button>}/>
-            <InfoRow label="Supplier" value={<span className="flex items-center gap-1"><Package className="h-3.5 w-3.5 text-slate-400"/>{po.supplierId}</span>}/>
-            <InfoRow label="Branch" value={<span className="flex items-center gap-1"><Building className="h-3.5 w-3.5 text-slate-400"/>{po.branchId}</span>}/>
+            <InfoRow label="Supplier" value={<span className="flex items-center gap-1"><Package className="h-3.5 w-3.5 text-slate-400"/>{po.supplierId ? resolveName(suppliers as any, po.supplierId, 'supplierName') : '—'}</span>}/>
+            <InfoRow label="Branch" value={<span className="flex items-center gap-1"><Building className="h-3.5 w-3.5 text-slate-400"/>{po.branchId ? resolveName(branches as any, po.branchId, 'branchName') : '—'}</span>}/>
             <InfoRow label="Description" value={po.description}/>
             <InfoRow label="Currency" value={<span className="flex items-center gap-1"><DollarSign className="h-3.5 w-3.5 text-slate-400"/>{po.currency}</span>}/>
             <InfoRow label="Total Amount" value={<span className="text-base font-bold text-emerald-700">{fmt(po.totalAmount,po.currency)}</span>}/>

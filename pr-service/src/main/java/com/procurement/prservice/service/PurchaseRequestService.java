@@ -76,4 +76,26 @@ public class PurchaseRequestService {
         }
         return prRepository.save(pr);
     }
+
+    @Transactional
+    public PurchaseRequest updatePurchaseRequest(String prNumber, PurchaseRequest update) {
+        PurchaseRequest existing = getPurchaseRequestById(prNumber);
+        if (!"PENDING_APPROVAL".equals(existing.getStatus())) {
+            throw new BusinessRuleException("Only Purchase Requests in PENDING_APPROVAL status can be edited.");
+        }
+        // Allow editing header fields only
+        existing.setDescription(update.getDescription());
+        existing.setPriority(update.getPriority());
+        existing.setNeedByDate(update.getNeedByDate());
+        existing.setSupplierId(update.getSupplierId());
+        existing.setCurrency(update.getCurrency());
+        // Recalculate line amounts
+        if (update.getPrLines() != null) {
+            for (var line : update.getPrLines()) {
+                line.setLineAmount(line.getQuantity().multiply(line.getUnitPrice()));
+            }
+            existing.setPrLines(update.getPrLines());
+        }
+        return prRepository.save(existing);
+    }
 }
