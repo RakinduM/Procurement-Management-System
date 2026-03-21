@@ -1,0 +1,23 @@
+# Maven build outputs
+target/
+!*/src/main/**
+!*/src/test/**
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+
+# Frontend node_modules (built inside Docker)
+frontend/node_modules/
+frontend/dist/
+
+# Logs
+*.log

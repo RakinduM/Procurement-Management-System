@@ -1,0 +1,116 @@
+package com.procurement.prservice.service;
+
+import com.procurement.common.exception.BusinessRuleException;
+import com.procurement.common.exception.ResourceNotFoundException;
+import com.procurement.prservice.client.ApprovalRequestDTO;
+import com.procurement.prservice.client.ApprovalServiceClient;
+import com.procurement.prservice.model.PRLine;
+import com.procurement.prservice.model.PurchaseRequest;
+import com.procurement.prservice.repository.PurchaseRequestRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.Date;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class PurchaseRequestService {
+
+    private final PurchaseRequestRepository prRepository;
+    private final ApprovalServiceClient approvalClient;
+
+    @Transactional
+    public PurchaseRequest createPurchaseRequest(PurchaseRequest pr, String token, String requestorId) {
+        if (pr.getPrLines() == null || pr.getPrLines().isEmpty()) {
+            throw new BusinessRuleException("PR must contain at least one line item.");
+        }
+
+        // Calculate line amounts
+        for (PRLine line : pr.getPrLines()) {
+            BigDecimal amount = line.getQuantity().multiply(line.getUnitPrice());
+            line.setLineAmount(amount);
+        }
+
+        pr.setPrNumber("PR2026" + UUID.randomUUID().toString().substring(0, 6).toUpperCase());
+        pr.setRequisitionDate(new Date());
+        pr.setCreatedAt(new Date());
+        pr.setRequestorId(requestorId);
+        pr.setStatus("PENDING_APPROVAL");
+
+        PurchaseRequest savedPr = prRepository.save(pr);
+
+        // Notify Approval Service
+        ApprovalRequestDTO approvalDTO = new ApprovalRequestDTO();
+        approvalDTO.setEntityType("PR");
+        approvalDTO.setEntityId(savedPr.getPrNumber());
+        approvalDTO.setRequestedBy(requestorId);
+        
+        try {
+            approvalClient.requestApproval(approvalDTO, token);
+        } catch (Exception e) {
+            // Rollback/Compensation logic usually needed here in microservices.
+            throw new BusinessRuleException("Failed to request approval context: " + e.getMessage());
+        }
+
+        return savedPr;
+    }
+
+    public PurchaseRequest getPurchaseRequestById(String prNumber) {
+        return prRepository.findById(prNumber)
+                .orElseThrow(() -> new ResourceNotFoundException("PR not found"));
+    }
+
+    public List<PurchaseRequest> getAllPurchaseRequests() {
+        return prRepository.findAll();
+    }
+
+    public PurchaseRequest updateStatus(String prNumber, String status, String rejectReason) {
+        PurchaseRequest pr = getPurchaseRequestById(prNumber);
+        pr.setStatus(status);
+        if (rejectReason != null) {
+            pr.setRejectReason(rejectReason);
+        }
+        return prRepository.save(pr);
+    }
+
+    @Transactional
+    public PurchaseRequest updatePurchaseRequest(String prNumber, PurchaseRequest update) {
+        PurchaseRequest existing = getPurchaseRequestById(prNumber);
+        if (!"PENDING_APPROVAL".equals(existing.getStatus())) {
+            throw new BusinessRuleException("Only Purchase Requests in PENDING_APPROVAL status can be edited.");
+        }
+        // Allow editing header fields only
+        existing.setDescription(update.getDescription());
+        existing.setPriority(update.getPriority());
+        existing.setNeedByDate(update.getNeedByDate());
+        existing.setSupplierId(update.getSupplierId());
+        existing.setCurrency(update.getCurrency());
+        // Recalculate line amounts
+        if (update.getPrLines() != null) {
+            for (var line : update.getPrLines()) {
+                line.setLineAmount(line.getQuantity().multiply(line.getUnitPrice()));
+            }
+            existing.setPrLines(update.getPrLines());
+        }
+        PurchaseRequest saved = prRepository.save(existing);
+
+        // Re-trigger the approval workflow so approvers see the updated content
+        try {
+            ApprovalRequestDTO dto = new ApprovalRequestDTO();
+            dto.setEntityType("PR");
+            dto.setEntityId(saved.getPrNumber());
+            dto.setRequestedBy(saved.getRequestorId());
+            approvalClient.reRequestApproval(dto, "Bearer internal");
+        } catch (Exception e) {
+            // Non-fatal: log but don't fail the save operation
+            System.err.println("[PurchaseRequestService] Failed to re-request approval for " + prNumber + ": " + e.getMessage());
+        }
+
+        return saved;
+    }
+}
+

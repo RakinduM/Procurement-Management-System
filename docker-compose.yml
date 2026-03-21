@@ -1,0 +1,253 @@
+version: '3.9'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Procurement Management System — Docker Compose
+#
+# Services startup order:
+#   MongoDB ➜ Eureka ➜ API Gateway ➜ Microservices ➜ Frontend
+#
+# Usage:
+#   docker-compose up --build          # first time
+#   docker-compose up -d               # background
+#   docker-compose logs -f <service>   # view logs
+#   docker-compose down -v             # stop + remove volumes
+# ─────────────────────────────────────────────────────────────────────────────
+
+networks:
+  procurement-net:
+    driver: bridge
+
+volumes:
+  mongo-user-data:
+  mongo-supplier-data:
+  mongo-pr-data:
+  mongo-po-data:
+  mongo-approval-data:
+
+# ── Shared environment snippets ─────────────────────────────────────────────
+x-eureka-env: &eureka-env
+  EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+
+x-common-service: &common-service
+  restart: unless-stopped
+  networks:
+    - procurement-net
+
+services:
+
+  # ── 1. MongoDB Instances ───────────────────────────────────────────────────
+  mongo-user:
+    image: mongo:7.0
+    <<: *common-service
+    container_name: mongo-user
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-user-data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: user_db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo-supplier:
+    image: mongo:7.0
+    <<: *common-service
+    container_name: mongo-supplier
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo-supplier-data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: supplier_db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo-pr:
+    image: mongo:7.0
+    <<: *common-service
+    container_name: mongo-pr
+    ports:
+      - "27019:27017"
+    volumes:
+      - mongo-pr-data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: pr_db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo-po:
+    image: mongo:7.0
+    <<: *common-service
+    container_name: mongo-po
+    ports:
+      - "27020:27017"
+    volumes:
+      - mongo-po-data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: po_db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo-approval:
+    image: mongo:7.0
+    <<: *common-service
+    container_name: mongo-approval
+    ports:
+      - "27021:27017"
+    volumes:
+      - mongo-approval-data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: approval_db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── 2. Eureka Service Registry ─────────────────────────────────────────────
+  eureka-server:
+    build:
+      context: .
+      dockerfile: eureka-server/Dockerfile
+    <<: *common-service
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    environment:
+      EUREKA_INSTANCE_HOSTNAME: eureka-server
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -q --spider http://localhost:8761/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+
+  # ── 3. API Gateway ─────────────────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    <<: *common-service
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      <<: *eureka-env
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+
+  # ── 4. User Service ────────────────────────────────────────────────────────
+  user-service:
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
+    <<: *common-service
+    container_name: user-service
+    ports:
+      - "8081:8081"
+    environment:
+      <<: *eureka-env
+      MONGO_URI: mongodb://mongo-user:27017/user_db
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      mongo-user:
+        condition: service_healthy
+
+  # ── 5. Supplier Service ────────────────────────────────────────────────────
+  supplier-service:
+    build:
+      context: .
+      dockerfile: supplier-service/Dockerfile
+    <<: *common-service
+    container_name: supplier-service
+    ports:
+      - "8082:8082"
+    environment:
+      <<: *eureka-env
+      MONGO_URI: mongodb://mongo-supplier:27017/supplier_db
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      mongo-supplier:
+        condition: service_healthy
+
+  # ── 6. PR Service ──────────────────────────────────────────────────────────
+  pr-service:
+    build:
+      context: .
+      dockerfile: pr-service/Dockerfile
+    <<: *common-service
+    container_name: pr-service
+    ports:
+      - "8083:8083"
+    environment:
+      <<: *eureka-env
+      MONGO_URI: mongodb://mongo-pr:27017/pr_db
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      mongo-pr:
+        condition: service_healthy
+
+  # ── 7. PO Service ──────────────────────────────────────────────────────────
+  po-service:
+    build:
+      context: .
+      dockerfile: po-service/Dockerfile
+    <<: *common-service
+    container_name: po-service
+    ports:
+      - "8084:8084"
+    environment:
+      <<: *eureka-env
+      MONGO_URI: mongodb://mongo-po:27017/po_db
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      mongo-po:
+        condition: service_healthy
+
+  # ── 8. Approval Service ────────────────────────────────────────────────────
+  approval-service:
+    build:
+      context: .
+      dockerfile: approval-service/Dockerfile
+    <<: *common-service
+    container_name: approval-service
+    ports:
+      - "8085:8085"
+    environment:
+      <<: *eureka-env
+      MONGO_URI: mongodb://mongo-approval:27017/approval_db
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      mongo-approval:
+        condition: service_healthy
+
+  # ── 9. Frontend (React + Nginx) ────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8080/api/v1
+    <<: *common-service
+    container_name: frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api-gateway
