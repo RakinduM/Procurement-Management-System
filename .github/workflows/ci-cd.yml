@@ -2,7 +2,7 @@ name: CI/CD — Procurement Management System
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main, dev, dev-temp]
   pull_request:
     branches: [main]
 
