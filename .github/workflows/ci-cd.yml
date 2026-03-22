@@ -96,7 +96,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────
   # JOB 3: Docker Build & Push (only on push to main or dev)
   # ─────────────────────────────────────────────────────────────────────────
-    docker-build-push:
+  docker-build-push:
     name: Docker Build & Push — ${{ matrix.service }}
     runs-on: ubuntu-latest
     needs: [build-backend, build-frontend]
