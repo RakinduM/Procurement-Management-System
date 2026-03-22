@@ -35,8 +35,10 @@ jobs:
           distribution: "temurin"
           cache: maven
 
-      - name: Build and test all services
-        run: mvn package --no-transfer-progress
+      - name: Build, Test & Sonar Scan
+        run: mvn clean verify sonar:sonar --no-transfer-progress
+        env:
+          SONAR_TOKEN: ${{ secrets.PROCUREMENT }}
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
