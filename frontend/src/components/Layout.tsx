@@ -24,8 +24,12 @@ const Layout = () => {
   useEffect(() => {
     if (!user) return; // Keep disconnected if not logged in
 
+    // Derive the WebSocket base URL by stripping '/api/v1' from the VITE server URL
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+    const wsUrl = `${apiUrl.replace('/api/v1', '')}/ws-approvals`;
+
     const stompClient = new Client({
-      webSocketFactory: () => new SockJS('http://localhost:8085/ws-approvals'),
+      webSocketFactory: () => new SockJS(wsUrl),
       reconnectDelay: 5000,
       onConnect: () => {
         console.log('Connected to WebSockets!');
