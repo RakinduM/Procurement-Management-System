@@ -6,17 +6,62 @@ on:
   pull_request:
     branches: [main]
 
+  # MANUAL TRIGGER
+  workflow_dispatch:
+    inputs:
+      deploy_all:
+        description: "Force deploy all services"
+        required: true
+        default: "false"
+
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ${{ github.repository_owner }}/procurement
 
 jobs:
-  # ─────────────────────────────────────────────────────────────────────────
-  # JOB 1: Build & Test — Backend (Maven multi-module)
-  # ─────────────────────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────
+  # DETECT CHANGES
+  # ─────────────────────────────────────────────────────────
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      eureka: ${{ steps.filter.outputs.eureka }}
+      gateway: ${{ steps.filter.outputs.gateway }}
+      user: ${{ steps.filter.outputs.user }}
+      supplier: ${{ steps.filter.outputs.supplier }}
+      pr: ${{ steps.filter.outputs.pr }}
+      po: ${{ steps.filter.outputs.po }}
+      approval: ${{ steps.filter.outputs.approval }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            eureka:
+              - 'eureka-server/**'
+            gateway:
+              - 'api-gateway/**'
+            user:
+              - 'user-service/**'
+            supplier:
+              - 'supplier-service/**'
+            pr:
+              - 'pr-service/**'
+            po:
+              - 'po-service/**'
+            approval:
+              - 'approval-service/**'
+
+  # ─────────────────────────────────────────────────────────
+  # BUILD BACKEND
+  # ─────────────────────────────────────────────────────────
   build-backend:
     name: Build & Test Backend
     runs-on: ubuntu-latest
+    needs: detect-changes
 
     services:
       mongodb:
@@ -43,22 +88,13 @@ jobs:
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.login=${{ secrets.PROCUREMENT }}
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-jars
-          path: |
-            */target/*.jar
-            !**/original-*.jar
-          retention-days: 7
-
-  # ─────────────────────────────────────────────────────────────────────────
-  # JOB 2: Build & Test — Frontend (Node/Vite)
-  # ─────────────────────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────
+  # BUILD FRONTEND
+  # ─────────────────────────────────────────────────────────
   build-frontend:
     name: Build & Test Frontend
     runs-on: ubuntu-latest
-
+    
     defaults:
       run:
         working-directory: frontend
@@ -86,153 +122,128 @@ jobs:
         env:
           VITE_API_URL: http://localhost:8080/api/v1
 
-      - name: Upload dist
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist/
-          retention-days: 7
-
-  # ─────────────────────────────────────────────────────────────────────────
-  # JOB 3: Docker Build & Push (only on push to main or dev)
-  # ─────────────────────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────
+  # DOCKER BUILD
+  # ─────────────────────────────────────────────────────────
   docker-build-push:
-    name: Docker Build & Push — ${{ matrix.service }}
+    name: Docker Build & Push
     runs-on: ubuntu-latest
-    needs: [build-backend, build-frontend]
-    if: github.event_name == 'push'
+    needs: [build-backend, build-frontend, detect-changes]
 
-    permissions:
-      contents: read
-      packages: write
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     strategy:
-      fail-fast: false
       matrix:
         include:
           - service: eureka-server
-            dockerfile: eureka-server/Dockerfile
-            context: .
+            key: eureka
           - service: api-gateway
-            dockerfile: api-gateway/Dockerfile
-            context: .
+            key: gateway
           - service: user-service
-            dockerfile: user-service/Dockerfile
-            context: .
+            key: user
           - service: supplier-service
-            dockerfile: supplier-service/Dockerfile
-            context: .
+            key: supplier
           - service: pr-service
-            dockerfile: pr-service/Dockerfile
-            context: .
+            key: pr
           - service: po-service
-            dockerfile: po-service/Dockerfile
-            context: .
+            key: po
           - service: approval-service
-            dockerfile: approval-service/Dockerfile
-            context: .
+            key: approval
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # -----------------------------
-      # DOCKER SETUP
-      # -----------------------------
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      # 🔥 SKIP LOGIC
+      - name: Skip if no changes (unless force deploy)
+        if: github.event.inputs.deploy_all != 'true' && needs.detect-changes.outputs[matrix.key] != 'true'
+        run: |
+          echo "Skipping ${{ matrix.service }}"
+          exit 0
 
-      # -----------------------------
-      # LOGIN GHCR (EXISTING)
-      # -----------------------------
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # -----------------------------
-      # LOGIN AWS ECR (NEW 🔥)
-      # -----------------------------
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+      - uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-1
 
-      - name: Login to Amazon ECR
-        id: login-ecr
+      - id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      # -----------------------------
-      # IMAGE TAGS
-      # -----------------------------
-      - name: Extract Docker metadata
-        id: meta
+      - id: meta
         uses: docker/metadata-action@v5
         with:
           images: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service }}
             ${{ steps.login-ecr.outputs.registry }}/${{ matrix.service }}
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix=sha-,format=short
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
-      # -----------------------------
-      # BUILD & PUSH (BOTH GHCR + ECR)
-      # -----------------------------
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v5
         with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.dockerfile }}
+          context: .
+          file: ${{ matrix.service }}/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
-  # ─────────────────────────────────────────────────────────────────────────
-  # JOB 4: Deploy to AWS ECS (ordered: Eureka ➡ Services ➡ API Gateway)
-  # ─────────────────────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────
+  # DEPLOY
+  # ─────────────────────────────────────────────────────────
   deploy:
-    name: Deploy to AWS ECS
     runs-on: ubuntu-latest
-    needs: [docker-build-push]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: production
+    needs: [docker-build-push, detect-changes]
+
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
 
     steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+      - uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-1
 
-      - name: "Step 1 — Deploy Eureka Server first"
+      # EUREKA
+      - name: Deploy Eureka
+        if: github.event.inputs.deploy_all == 'true' || needs.detect-changes.outputs.eureka == 'true'
         run: |
           aws ecs update-service --cluster procurement-cluster --service eureka-server --force-new-deployment
-          echo "Waiting for Eureka to stabilize..."
           aws ecs wait services-stable --cluster procurement-cluster --services eureka-server
-          echo "Eureka Server is stable!"
 
-      - name: "Step 2 — Deploy all Microservices in parallel"
+      # MICROSERVICES
+      - name: Deploy user-service
+        if: github.event.inputs.deploy_all == 'true' || needs.detect-changes.outputs.user == 'true'
+        run: aws ecs update-service --cluster procurement-cluster --service user-service --force-new-deployment
+
+      - name: Deploy supplier-service
+        if: github.event.inputs.deploy_all == 'true' || needs.detect-changes.outputs.supplier == 'true'
+        run: aws ecs update-service --cluster procurement-cluster --service supplier-service --force-new-deployment
+
+      - name: Deploy pr-service
+        if: github.event.inputs.deploy_all == 'true' || needs.detect-changes.outputs.pr == 'true'
+        run: aws ecs update-service --cluster procurement-cluster --service pr-service --force-new-deployment
+
+      - name: Deploy po-service
+        if: github.event.inputs.deploy_all == 'true' || needs.detect-changes.outputs.po == 'true'
+        run: aws ecs update-service --cluster procurement-cluster --service po-service --force-new-deployment
+
+      - name: Deploy approval-service
+        if: github.event.inputs.deploy_all == 'true' || needs.detect-changes.outputs.approval == 'true'
+        run: aws ecs update-service --cluster procurement-cluster --service approval-service --force-new-deployment
+
+      # WAIT
+      - name: Wait for services
         run: |
-          aws ecs update-service --cluster procurement-cluster --service user-service --force-new-deployment
-          aws ecs update-service --cluster procurement-cluster --service supplier-service --force-new-deployment
-          aws ecs update-service --cluster procurement-cluster --service pr-service --force-new-deployment
-          aws ecs update-service --cluster procurement-cluster --service po-service --force-new-deployment
-          aws ecs update-service --cluster procurement-cluster --service approval-service --force-new-deployment
-          echo "Waiting for microservices to stabilize..."
-          aws ecs wait services-stable --cluster procurement-cluster --services user-service supplier-service pr-service po-service approval-service
-          echo "All microservices are stable!"
+          aws ecs wait services-stable --cluster procurement-cluster \
+          --services user-service supplier-service pr-service po-service approval-service || true
 
-      - name: "Step 3 — Deploy API Gateway last"
+      # API GATEWAY LAST
+      - name: Deploy API Gateway
+        if: github.event.inputs.deploy_all == 'true' || needs.detect-changes.outputs.gateway == 'true'
         run: |
           aws ecs update-service --cluster procurement-cluster --service api-gateway --force-new-deployment
-          echo "Waiting for API Gateway to stabilize..."
           aws ecs wait services-stable --cluster procurement-cluster --services api-gateway
-          echo "API Gateway is live! Deployment complete."
