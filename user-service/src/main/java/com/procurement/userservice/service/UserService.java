@@ -39,4 +39,35 @@ public class UserService {
     public List<User> getAllUsers() {
         return userRepository.findAll();
     }
+
+    public User updateUser(String id, User updatedUser) {
+        User existingUser = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+
+        if (!existingUser.getUsername().equals(updatedUser.getUsername()) && userRepository.existsByUsername(updatedUser.getUsername())) {
+            throw new RuntimeException("Username already exists");
+        }
+        if (!existingUser.getEmail().equals(updatedUser.getEmail()) && userRepository.existsByEmail(updatedUser.getEmail())) {
+            throw new RuntimeException("Email already exists");
+        }
+
+        existingUser.setUsername(updatedUser.getUsername());
+        existingUser.setEmail(updatedUser.getEmail());
+        existingUser.setRoleId(updatedUser.getRoleId());
+        existingUser.setBranchId(updatedUser.getBranchId());
+        existingUser.setDepartmentId(updatedUser.getDepartmentId());
+        existingUser.setActive(updatedUser.isActive());
+
+        if (updatedUser.getPassword() != null && !updatedUser.getPassword().trim().isEmpty()) {
+            existingUser.setPassword(passwordEncoder.encode(updatedUser.getPassword()));
+        }
+
+        return userRepository.save(existingUser);
+    }
+
+    public void deleteUser(String id) {
+        User existingUser = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+        userRepository.delete(existingUser);
+    }
 }

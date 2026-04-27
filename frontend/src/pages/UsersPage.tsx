@@ -50,6 +50,18 @@ export const UsersPage: React.FC = () => {
     active: true
   });
 
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState({
+    id: '',
+    username: '',
+    email: '',
+    password: '',
+    roleId: '',
+    branchId: '',
+    departmentId: '',
+    active: true
+  });
+
   // Reference Data State
   const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
   const [availableBranches, setAvailableBranches] = useState<Branch[]>([]);
@@ -106,6 +118,46 @@ export const UsersPage: React.FC = () => {
       setError(err.response?.data?.message || 'Failed to create user');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleEditClick = (user: User) => {
+    setEditingUser({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      password: '', // Blank by default when editing
+      roleId: user.roleId,
+      branchId: user.branchId,
+      departmentId: user.departmentId,
+      active: user.active
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      await api.put(`/users/${editingUser.id}`, editingUser);
+      setIsEditModalOpen(false);
+      fetchUsers();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to update user');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteClick = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      try {
+        await api.delete(`/users/${id}`);
+        fetchUsers();
+      } catch (err: any) {
+        alert(err.response?.data?.message || 'Failed to delete user');
+      }
     }
   };
 
@@ -233,6 +285,7 @@ export const UsersPage: React.FC = () => {
                         <div className="flex justify-end gap-2">
                           <button
                             title="Edit User"
+                            onClick={() => handleEditClick(user)}
                             className="text-primary-600 hover:text-primary-900 p-1.5 hover:bg-primary-50 rounded-lg transition-colors border border-transparent hover:border-primary-100"
                           >
                             <Edit2 className="h-4 w-4" />
@@ -240,6 +293,7 @@ export const UsersPage: React.FC = () => {
                           {currentUser?.username !== user.username && (
                             <button
                               title="Deactivate / Remove User"
+                              onClick={() => handleDeleteClick(user.id)}
                               className="text-red-600 hover:text-red-900 p-1.5 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -339,6 +393,95 @@ export const UsersPage: React.FC = () => {
               <button type="submit" form="addUserForm" disabled={submitting} className="inline-flex items-center justify-center px-5 py-2.5 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none transition-all disabled:opacity-70 disabled:cursor-not-allowed">
                 {submitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div> : <Save className="h-4 w-4 mr-2" />}
                 Save User
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-6 border-b border-slate-100 bg-slate-50/50">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center">
+                <div className="w-8 h-8 rounded-lg bg-primary-100 text-primary-700 flex items-center justify-center mr-3">
+                  <Edit2 className="h-4 w-4" />
+                </div>
+                Edit User
+              </h3>
+              <button onClick={() => setIsEditModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto">
+              {error && (
+                <div className="mb-6 bg-red-50 text-red-600 p-4 rounded-xl text-sm font-medium border border-red-100 flex items-center">
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-600 mr-2"></div>
+                  {error}
+                </div>
+              )}
+              
+              <form id="editUserForm" onSubmit={handleEditUser} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Username *</label>
+                  <input type="text" required value={editingUser.username} onChange={e => setEditingUser({...editingUser, username: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Email *</label>
+                  <input type="email" required value={editingUser.email} onChange={e => setEditingUser({...editingUser, email: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Password (Leave blank to keep current)</label>
+                  <input type="password" value={editingUser.password} onChange={e => setEditingUser({...editingUser, password: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors" placeholder="••••••••" />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Role *</label>
+                    <select required value={editingUser.roleId} onChange={e => setEditingUser({...editingUser, roleId: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-colors">
+                      <option value="" disabled>Select Role</option>
+                      {availableRoles.map(r => (
+                         <option key={r.id} value={r.id}>{r.roleName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Branch *</label>
+                    <select required value={editingUser.branchId} onChange={e => setEditingUser({...editingUser, branchId: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-colors">
+                      <option value="" disabled>Select Branch</option>
+                      {availableBranches.map(b => (
+                         <option key={b.id} value={b.id}>{b.branchName}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Department *</label>
+                  <select required value={editingUser.departmentId} onChange={e => setEditingUser({...editingUser, departmentId: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-colors">
+                    <option value="" disabled>Select Department</option>
+                    {availableDepartments.map(d => (
+                        <option key={d.id} value={d.id}>{d.departmentName}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center mt-2">
+                   <input type="checkbox" id="editActiveToggle" checked={editingUser.active} onChange={e => setEditingUser({...editingUser, active: e.target.checked})} className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-slate-300 rounded" />
+                   <label htmlFor="editActiveToggle" className="ml-2 block text-sm text-slate-700">User is Active</label>
+                </div>
+              </form>
+            </div>
+            
+            <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50 mt-auto">
+              <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-5 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-xl shadow-sm hover:bg-slate-50 transition-colors">
+                Cancel
+              </button>
+              <button type="submit" form="editUserForm" disabled={submitting} className="inline-flex items-center justify-center px-5 py-2.5 border border-transparent text-sm font-medium rounded-xl shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none transition-all disabled:opacity-70 disabled:cursor-not-allowed">
+                {submitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div> : <Save className="h-4 w-4 mr-2" />}
+                Save Changes
               </button>
             </div>
           </div>
