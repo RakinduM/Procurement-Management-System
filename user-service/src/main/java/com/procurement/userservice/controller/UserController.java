@@ -34,4 +34,18 @@ public class UserController {
         List<User> users = userService.getAllUsers();
         return ResponseEntity.ok(CommonResponse.success(users, "Users fetched successfully"));
     }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<CommonResponse<User>> updateUser(@PathVariable String id, @RequestBody User user) {
+        User updatedUser = userService.updateUser(id, user);
+        return ResponseEntity.ok(CommonResponse.success(updatedUser, "User updated successfully"));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<CommonResponse<Void>> deleteUser(@PathVariable String id) {
+        userService.deleteUser(id);
+        return ResponseEntity.ok(CommonResponse.success(null, "User deleted successfully"));
+    }
 }
