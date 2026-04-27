@@ -247,3 +247,9 @@ jobs:
         run: |
           aws ecs update-service --cluster procurement-cluster --service api-gateway --force-new-deployment
           aws ecs wait services-stable --cluster procurement-cluster --services api-gateway
+
+      - name: Deploy Frontend (Render)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "Triggering Render deployment..."
+          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
