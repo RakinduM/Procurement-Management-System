@@ -22,7 +22,7 @@ public class UserService {
             throw new RuntimeException("Username already exists");
         }
         if (userRepository.existsByEmail(user.getEmail())) {
-            throw new RuntimeException("Email already exists");
+            throw new RuntimeException("Email already exists try another email");
         }
         
         user.setPassword(passwordEncoder.encode(user.getPassword()));
